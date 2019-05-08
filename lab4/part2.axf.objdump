@@ -1,0 +1,71 @@
+
+W:/lab4/part2.axf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <__cs3_interrupt_vector>:
+/* Program that counts consecutive 1s */
+
+          .text                   // executable code follows
+          .global _start     
+		  
+_start:   MOV	  R5, #0		  // intialize longest string to 0
+   0:	e3a05000 	mov	r5, #0
+		  MOV	  R0, #0		  // intialize current string length to 0
+   4:	e3a00000 	mov	r0, #0
+		  MOV     R3, #TEST_NUM   // load the data word ...
+   8:	e3a03048 	mov	r3, #72	; 0x48
+
+0000000c <MAIN>:
+
+
+MAIN:	  CMP	  R5, R0          // check if last word has longer string
+   c:	e1550000 	cmp	r5, r0
+		  MOVLE	  R5, R0 		  // if last word has longer string
+  10:	d1a05000 	movle	r5, r0
+		  
+
+          LDR     R1, [R3]        // into R1
+  14:	e5931000 	ldr	r1, [r3]
+		  CMP	  R1, #0          // checks if loaded data word was 0, ends program if true
+  18:	e3510000 	cmp	r1, #0
+		  BEQ	  END
+  1c:	0a000008 	beq	44 <END>
+		  MOV     R0, #0		  // reset R0 counter
+  20:	e3a00000 	mov	r0, #0
+		  B       ONES
+  24:	eaffffff 	b	28 <ONES>
+
+00000028 <ONES>:
+		  
+ONES:     CMP     R1, #0          // loop until the data contains no more 1's
+  28:	e3510000 	cmp	r1, #0
+		  ADDEQ	  R3, #4		  // move forward in list
+  2c:	02833004 	addeq	r3, r3, #4
+          BEQ     MAIN             
+  30:	0afffff5 	beq	c <MAIN>
+          LSR     R2, R1, #1      // perform SHIFT, followed by AND
+  34:	e1a020a1 	lsr	r2, r1, #1
+          AND     R1, R1, R2      
+  38:	e0011002 	and	r1, r1, r2
+          ADD     R0, #1          // count the string length so far
+  3c:	e2800001 	add	r0, r0, #1
+          B       ONES   
+  40:	eafffff8 	b	28 <ONES>
+
+00000044 <END>:
+		  
+END:      B       END  
+  44:	eafffffe 	b	44 <END>
+
+00000048 <TEST_NUM>:
+  48:	103fe00f 	.word	0x103fe00f
+  4c:	0009e3ff 	.word	0x0009e3ff
+  50:	07ffffff 	.word	0x07ffffff
+  54:	03f80fff 	.word	0x03f80fff
+  58:	000b80ff 	.word	0x000b80ff
+  5c:	00ff5507 	.word	0x00ff5507
+  60:	7fffffff 	.word	0x7fffffff
+  64:	00000001 	.word	0x00000001
+  68:	00000000 	.word	0x00000000

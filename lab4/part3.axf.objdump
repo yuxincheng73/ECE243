@@ -1,0 +1,166 @@
+
+W:/lab4/part3.axf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <__cs3_interrupt_vector>:
+/* Program that counts consecutive 1s */
+
+          .text                   // executable code follows
+          .global _start     
+		  
+_start:   MOV	  R5, #0		  // initialize longest 1s to 0
+   0:	e3a05000 	mov	r5, #0
+		  MOV	  R6, #0		  // initialize longest 0s 
+   4:	e3a06000 	mov	r6, #0
+		  MOV     R7, #0		  // initialize longest alternate
+   8:	e3a07000 	mov	r7, #0
+		  
+		  MOV	  R8, #0		  // initialize current 1s to 0
+   c:	e3a08000 	mov	r8, #0
+		  MOV	  R9, #0		  // initialize current 0s 
+  10:	e3a09000 	mov	r9, #0
+		  MOV     R10, #0		  // initialize current alternate
+  14:	e3a0a000 	mov	r10, #0
+		  
+		  MOV     R3, #TEST_NUM   // load the data word ...
+  18:	e3a030d0 	mov	r3, #208	; 0xd0
+
+0000001c <MAIN>:
+
+
+MAIN:	  CMP	  R5, R8          // check if last 1s has longer string
+  1c:	e1550008 	cmp	r5, r8
+		  MOVLE	  R5, R8 		  // 
+  20:	d1a05008 	movle	r5, r8
+		  CMP	  R6, R9          // check if last 0s has longer string
+  24:	e1560009 	cmp	r6, r9
+		  MOVLE	  R6, R9 		  // 
+  28:	d1a06009 	movle	r6, r9
+		  CMP	  R7, R10         // check if last alternate has longer string
+  2c:	e157000a 	cmp	r7, r10
+		  MOVLE	  R7, R10 		  // 
+  30:	d1a0700a 	movle	r7, r10
+		   
+
+          LDR     R1, [R3]        // move current word into R1
+  34:	e5931000 	ldr	r1, [r3]
+		  CMP	  R1, #0          // checks if loaded data word was 0, ends program if true
+  38:	e3510000 	cmp	r1, #0
+		  BEQ	  END
+  3c:	0a000022 	beq	cc <END>
+		  MOV     R8, #0		  // reset 1s counter
+  40:	e3a08000 	mov	r8, #0
+		  MOV     R9, #0 	      // reset 0s counter
+  44:	e3a09000 	mov	r9, #0
+		  MOV     R10,#0          // reset alternate counter
+  48:	e3a0a000 	mov	r10, #0
+		  B       ONES
+  4c:	eaffffff 	b	50 <ONES>
+
+00000050 <ONES>:
+		  
+ONES:     CMP     R1, #0          // loop until the data contains no more 1's
+  50:	e3510000 	cmp	r1, #0
+          BEQ     ZEROPREP             
+  54:	0a000003 	beq	68 <ZEROPREP>
+          LSR     R2, R1, #1      // perform SHIFT, followed by AND
+  58:	e1a020a1 	lsr	r2, r1, #1
+          AND     R1, R1, R2      
+  5c:	e0011002 	and	r1, r1, r2
+          ADD     R8, #1          // count the string length so far
+  60:	e2888001 	add	r8, r8, #1
+          B       ONES  
+  64:	eafffff9 	b	50 <ONES>
+
+00000068 <ZEROPREP>:
+
+ZEROPREP: LDR	  R1, [R3]		  // restore current word
+  68:	e5931000 	ldr	r1, [r3]
+		  MVN     R1, R1		  // invert the word
+  6c:	e1e01001 	mvn	r1, r1
+		  B		  ZEROS
+  70:	eaffffff 	b	74 <ZEROS>
+
+00000074 <ZEROS>:
+		  
+ZEROS:	  CMP     R1, #0          // loop until the data contains no more 1's
+  74:	e3510000 	cmp	r1, #0
+          BEQ     ALTERNATEPREP             
+  78:	0a000003 	beq	8c <ALTERNATEPREP>
+          LSR     R2, R1, #1      // perform SHIFT, followed by AND
+  7c:	e1a020a1 	lsr	r2, r1, #1
+          AND     R1, R1, R2      
+  80:	e0011002 	and	r1, r1, r2
+          ADD     R9, #1          // count the string length so far
+  84:	e2899001 	add	r9, r9, #1
+          B       ZEROS
+  88:	eafffff9 	b	74 <ZEROS>
+
+0000008c <ALTERNATEPREP>:
+		  
+ALTERNATEPREP:    LDR R1, [R3]	  // restore current word
+  8c:	e5931000 	ldr	r1, [r3]
+				  MOV R11, #XOR_CHECK
+  90:	e3a0b0f8 	mov	r11, #248	; 0xf8
+				  LDR R11, [R11]
+  94:	e59bb000 	ldr	r11, [r11]
+				  CMP R1, R11 	  // check MSB of word
+  98:	e151000b 	cmp	r1, r11
+				  MOV R11, #XOR_CONSTANT_MSB_ONE     // if MSB is equal to 1 (no z flag)
+  9c:	e3a0bc01 	mov	r11, #256	; 0x100
+				  MOVEQ R11, #XOR_CONSTANT_MSB_ONE  // if MSB is 1 but (with z flag) 
+  a0:	03a0bc01 	moveq	r11, #256	; 0x100
+				  MOVLT R11, #XOR_CONSTANT_MSB_ZERO // if MSB is equal to 0
+  a4:	b3a0b0fc 	movlt	r11, #252	; 0xfc
+ 
+				  LDR R11, [R11] 
+  a8:	e59bb000 	ldr	r11, [r11]
+				  EOR R1, R11
+  ac:	e021100b 	eor	r1, r1, r11
+
+000000b0 <ALTERNATE>:
+				  
+ALTERNATE:		  CMP     R1, #0          // loop until the data contains no more 1's
+  b0:	e3510000 	cmp	r1, #0
+				  ADDEQ	  R3, #4		  // move forward in list
+  b4:	02833004 	addeq	r3, r3, #4
+				  BEQ     MAIN             
+  b8:	0affffd7 	beq	1c <MAIN>
+				  LSR     R2, R1, #1      // perform SHIFT, followed by AND
+  bc:	e1a020a1 	lsr	r2, r1, #1
+				  AND     R1, R1, R2      
+  c0:	e0011002 	and	r1, r1, r2
+				  ADD     R10, #1          // count the string length so far
+  c4:	e28aa001 	add	r10, r10, #1
+				  B       ALTERNATE
+  c8:	eafffff8 	b	b0 <ALTERNATE>
+
+000000cc <END>:
+
+
+		  
+END:      B       END  
+  cc:	eafffffe 	b	cc <END>
+
+000000d0 <TEST_NUM>:
+  d0:	103fe00f 	.word	0x103fe00f
+  d4:	0009e3ff 	.word	0x0009e3ff
+  d8:	07ffffff 	.word	0x07ffffff
+  dc:	03f80fff 	.word	0x03f80fff
+  e0:	000b80ff 	.word	0x000b80ff
+  e4:	00ff5507 	.word	0x00ff5507
+  e8:	7fffffff 	.word	0x7fffffff
+  ec:	00000001 	.word	0x00000001
+  f0:	aaaaaaa0 	.word	0xaaaaaaa0
+  f4:	00000000 	.word	0x00000000
+
+000000f8 <XOR_CHECK>:
+  f8:	80000000 	.word	0x80000000
+
+000000fc <XOR_CONSTANT_MSB_ZERO>:
+  fc:	aaaaaaaa 	.word	0xaaaaaaaa
+
+00000100 <XOR_CONSTANT_MSB_ONE>:
+ 100:	55555555 	.word	0x55555555
