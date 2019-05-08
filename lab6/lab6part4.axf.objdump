@@ -1,0 +1,729 @@
+
+W:/lab6/lab6part4.axf:     file format elf32-littlearm
+
+
+Disassembly of section .vectors:
+
+00000000 <__cs3_interrupt_vector>:
+   0:	ea000032 	b	d0 <_start>
+   4:	ea0000de 	b	384 <SERVICE_UND>
+   8:	ea0000de 	b	388 <SERVICE_SVC>
+   c:	ea0000de 	b	38c <SERVICE_ABT_INST>
+  10:	ea0000de 	b	390 <SERVICE_ABT_DATA>
+  14:	00000000 	.word	0x00000000
+  18:	ea000042 	b	128 <SERVICE_IRQ>
+  1c:	ea0000dc 	b	394 <SERVICE_FIQ>
+
+Disassembly of section .text:
+
+00000040 <__cs3_region_start_ram>:
+
+
+
+
+CONFIG_GIC:
+				PUSH		{LR}
+  40:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+    			/* Configure the A9 Private Timer interrupt, FPGA KEYs, and FPGA Timer
+				/* CONFIG_INTERRUPT (int_ID (R0), CPU_target (R1)); */
+    			MOV		R0, #MPCORE_PRIV_TIMER_IRQ
+  44:	e3a0001d 	mov	r0, #29
+    			MOV		R1, #CPU0
+  48:	e3a01001 	mov	r1, #1
+    			BL			CONFIG_INTERRUPT
+  4c:	eb00000d 	bl	88 <CONFIG_INTERRUPT>
+    			MOV		R0, #INTERVAL_TIMER_IRQ
+  50:	e3a00048 	mov	r0, #72	; 0x48
+    			MOV		R1, #CPU0
+  54:	e3a01001 	mov	r1, #1
+    			BL			CONFIG_INTERRUPT
+  58:	eb00000a 	bl	88 <CONFIG_INTERRUPT>
+    			MOV		R0, #KEYS_IRQ
+  5c:	e3a00049 	mov	r0, #73	; 0x49
+    			MOV		R1, #CPU0
+  60:	e3a01001 	mov	r1, #1
+    			BL			CONFIG_INTERRUPT
+  64:	eb000007 	bl	88 <CONFIG_INTERRUPT>
+
+				/* configure the GIC CPU interface */
+    			LDR		R0, =0xFFFEC100		// base address of CPU interface
+  68:	e59f0360 	ldr	r0, [pc, #864]	; 3d0 <GO_TIME+0x4>
+    			/* Set Interrupt Priority Mask Register (ICCPMR) */
+    			LDR		R1, =0xFFFF 			// enable interrupts of all priorities levels
+  6c:	e59f1360 	ldr	r1, [pc, #864]	; 3d4 <GO_TIME+0x8>
+    			STR		R1, [R0, #0x04]
+  70:	e5801004 	str	r1, [r0, #4]
+    			/* Set the enable bit in the CPU Interface Control Register (ICCICR). This bit
+				 * allows interrupts to be forwarded to the CPU(s) */
+    			MOV		R1, #1
+  74:	e3a01001 	mov	r1, #1
+    			STR		R1, [R0]
+  78:	e5801000 	str	r1, [r0]
+    
+    			/* Set the enable bit in the Distributor Control Register (ICDDCR). This bit
+				 * allows the distributor to forward interrupts to the CPU interface(s) */
+    			LDR		R0, =0xFFFED000
+  7c:	e59f0354 	ldr	r0, [pc, #852]	; 3d8 <GO_TIME+0xc>
+    			STR		R1, [R0]    
+  80:	e5801000 	str	r1, [r0]
+    
+    			POP     	{PC}
+  84:	e49df004 	pop	{pc}		; (ldr pc, [sp], #4)
+
+00000088 <CONFIG_INTERRUPT>:
+ * other registers in the GIC
+ * Arguments: R0 = interrupt ID, N
+ *            R1 = CPU target
+*/
+CONFIG_INTERRUPT:
+    			PUSH		{R4-R5, LR}
+  88:	e92d4030 	push	{r4, r5, lr}
+    
+    			/* Configure Interrupt Set-Enable Registers (ICDISERn). 
+				 * reg_offset = (integer_div(N / 32) * 4
+				 * value = 1 << (N mod 32) */
+    			LSR		R4, R0, #3							// calculate reg_offset
+  8c:	e1a041a0 	lsr	r4, r0, #3
+    			BIC		R4, R4, #3							// R4 = reg_offset
+  90:	e3c44003 	bic	r4, r4, #3
+				LDR		R2, =0xFFFED100
+  94:	e59f2340 	ldr	r2, [pc, #832]	; 3dc <GO_TIME+0x10>
+				ADD		R4, R2, R4							// R4 = address of ICDISER
+  98:	e0824004 	add	r4, r2, r4
+    
+    			AND		R2, R0, #0x1F   					// N mod 32
+  9c:	e200201f 	and	r2, r0, #31
+				MOV		R5, #1								// enable
+  a0:	e3a05001 	mov	r5, #1
+    			LSL		R2, R5, R2							// R2 = value
+  a4:	e1a02215 	lsl	r2, r5, r2
+
+				/* now that we have the register address (R4) and value (R2), we need to set the
+				 * correct bit in the GIC register */
+    			LDR		R3, [R4]								// read current register value
+  a8:	e5943000 	ldr	r3, [r4]
+    			ORR		R3, R3, R2							// set the enable bit
+  ac:	e1833002 	orr	r3, r3, r2
+    			STR		R3, [R4]								// store the new register value
+  b0:	e5843000 	str	r3, [r4]
+
+    			/* Configure Interrupt Processor Targets Register (ICDIPTRn)
+     			 * reg_offset = integer_div(N / 4) * 4
+     			 * index = N mod 4 */
+    			BIC		R4, R0, #3							// R4 = reg_offset
+  b4:	e3c04003 	bic	r4, r0, #3
+				LDR		R2, =0xFFFED800
+  b8:	e59f2320 	ldr	r2, [pc, #800]	; 3e0 <GO_TIME+0x14>
+				ADD		R4, R2, R4							// R4 = word address of ICDIPTR
+  bc:	e0824004 	add	r4, r2, r4
+    			AND		R2, R0, #0x3						// N mod 4
+  c0:	e2002003 	and	r2, r0, #3
+				ADD		R4, R2, R4							// R4 = byte address in ICDIPTR
+  c4:	e0824004 	add	r4, r2, r4
+
+				/* now that we have the register address (R4) and value (R2), write to (only)
+				 * the appropriate byte */
+				STRB		R1, [R4]
+  c8:	e5c41000 	strb	r1, [r4]
+                B        SERVICE_SVC         // software interrupt vector
+                B        SERVICE_ABT_INST    // aborted prefetch vector
+                B        SERVICE_ABT_DATA    // aborted data vector
+                .word    0                   // unused vector
+                B        SERVICE_IRQ         // IRQ interrupt vector
+                B        SERVICE_FIQ         // FIQ interrupt vector
+  cc:	e8bd8030 	pop	{r4, r5, pc}
+
+000000d0 <_start>:
+
+
+.text
+.global _start
+_start:
+MOV R1, #0b11010010  
+  d0:	e3a010d2 	mov	r1, #210	; 0xd2
+MSR CPSR_c, R1
+  d4:	e121f001 	msr	CPSR_c, r1
+LDR SP, =0xFFFFFFFC  //set IRQ stack pointer
+  d8:	e3e0d003 	mvn	sp, #3
+
+MOV R1, #0b11010011 //go into SVC mode with disabled interrupts
+  dc:	e3a010d3 	mov	r1, #211	; 0xd3
+MSR CPSR_c, R1
+  e0:	e121f001 	msr	CPSR_c, r1
+LDR SP, =0x3FFFFFFC //SVC stack pointer set
+  e4:	e3e0d10f 	mvn	sp, #-1073741821	; 0xc0000003
+ 
+
+BL CONFIG_GIC //config GIC for interrupts
+  e8:	ebffffd4 	bl	40 <__cs3_region_start_ram>
+
+//config push buttons
+
+LDR R0,=KEY_BASE
+  ec:	e59f02f0 	ldr	r0, [pc, #752]	; 3e4 <GO_TIME+0x18>
+MOV R1, #0xF //enable interrupts for all four keys
+  f0:	e3a0100f 	mov	r1, #15
+STR R1, [R0, #8]
+  f4:	e5801008 	str	r1, [r0, #8]
+
+BL CONFIG_TIMER
+  f8:	eb00001d 	bl	174 <CONFIG_TIMER>
+BL CONFIG_PRIVATE_TIMER
+  fc:	eb000024 	bl	194 <CONFIG_PRIVATE_TIMER>
+
+MOV R0, #0b01010011 //enable  interrupts in SVC mode
+ 100:	e3a00053 	mov	r0, #83	; 0x53
+MSR CPSR_c, R0
+ 104:	e121f000 	msr	CPSR_c, r0
+
+
+LDR R4,=COUNT
+ 108:	e59f42d8 	ldr	r4, [pc, #728]	; 3e8 <GO_TIME+0x1c>
+LDR R6,=RUN
+ 10c:	e59f62d8 	ldr	r6, [pc, #728]	; 3ec <GO_TIME+0x20>
+LDR R3, =LEDR_BASE
+ 110:	e59f32d8 	ldr	r3, [pc, #728]	; 3f0 <__cs3_region_init_size_ram>
+LDR R8,=TIME
+ 114:	e59f82d8 	ldr	r8, [pc, #728]	; 3f4 <__cs3_region_init_size_ram+0x4>
+
+00000118 <LOOP>:
+
+LOOP:
+LDR R5, [R4]
+ 118:	e5945000 	ldr	r5, [r4]
+STR R5, [R3]
+ 11c:	e5835000 	str	r5, [r3]
+LDR R9,[R8]
+ 120:	e5989000 	ldr	r9, [r8]
+
+
+B LOOP
+ 124:	eafffffb 	b	118 <LOOP>
+
+00000128 <SERVICE_IRQ>:
+
+
+
+SERVICE_IRQ:    PUSH     {R0-R7, LR}     
+ 128:	e92d40ff 	push	{r0, r1, r2, r3, r4, r5, r6, r7, lr}
+                LDR      R4, =0xFFFEC100 // GIC CPU interface base address
+ 12c:	e59f429c 	ldr	r4, [pc, #668]	; 3d0 <GO_TIME+0x4>
+                LDR      R5, [R4, #0x0C] // read the ICCIAR in the CPU
+ 130:	e594500c 	ldr	r5, [r4, #12]
+
+00000134 <CHECK_PUSH>:
+                                         // interface
+
+KEYS_HANDLER:                       
+CHECK_PUSH:   	CMP      R5, #73         // check the interrupt ID
+ 134:	e3550049 	cmp	r5, #73	; 0x49
+				
+                BNE     CHECK_TIMER     // if not recognized, stop here
+ 138:	1a000001 	bne	144 <CHECK_TIMER>
+          	BL 	KEY_ISR
+ 13c:	eb000055 	bl	298 <KEY_ISR>
+                B       EXIT_IRQ
+ 140:	ea000008 	b	168 <EXIT_IRQ>
+
+00000144 <CHECK_TIMER>:
+CHECK_TIMER:    CMP 	R5, #72
+ 144:	e3550048 	cmp	r5, #72	; 0x48
+		BNE     CHECK_PRIVATE_TIMER
+ 148:	1a000001 	bne	154 <CHECK_PRIVATE_TIMER>
+		BL      TIMER_ISR
+ 14c:	eb000043 	bl	260 <TIMER_ISR>
+                B       EXIT_IRQ
+ 150:	ea000004 	b	168 <EXIT_IRQ>
+
+00000154 <CHECK_PRIVATE_TIMER>:
+                
+CHECK_PRIVATE_TIMER:
+		CMP R5, #29
+ 154:	e355001d 	cmp	r5, #29
+                BNE UNEXPECTED
+ 158:	1a000001 	bne	164 <UNEXPECTED>
+                BL  PRIVATE_TIMER_ISR
+ 15c:	eb000012 	bl	1ac <PRIVATE_TIMER_ISR>
+                B EXIT_IRQ
+ 160:	ea000000 	b	168 <EXIT_IRQ>
+
+00000164 <UNEXPECTED>:
+                
+                
+UNEXPECTED:     B        UNEXPECTED
+ 164:	eafffffe 	b	164 <UNEXPECTED>
+
+00000168 <EXIT_IRQ>:
+
+EXIT_IRQ:       STR      R5, [R4, #0x10] // write to the End of Interrupt
+ 168:	e5845010 	str	r5, [r4, #16]
+                                         // Register (ICCEOIR)
+                POP      {R0-R7, LR}     
+ 16c:	e8bd40ff 	pop	{r0, r1, r2, r3, r4, r5, r6, r7, lr}
+                SUBS     PC, LR, #4      // return from exception
+ 170:	e25ef004 	subs	pc, lr, #4
+
+00000174 <CONFIG_TIMER>:
+
+
+CONFIG_TIMER:
+LDR R0,=TIMER_BASE
+ 174:	e59f027c 	ldr	r0, [pc, #636]	; 3f8 <__cs3_region_init_size_ram+0x8>
+LDR R1,=0b0111100001000000
+ 178:	e59f127c 	ldr	r1, [pc, #636]	; 3fc <__cs3_region_init_size_ram+0xc>
+
+//load counterLow
+STR R1,[R0,#8]
+ 17c:	e5801008 	str	r1, [r0, #8]
+//load counterHigh
+LDR R1,=0b101111101
+ 180:	e59f1278 	ldr	r1, [pc, #632]	; 400 <__cs3_region_init_size_ram+0x10>
+STR R1, [R0,#12]
+ 184:	e580100c 	str	r1, [r0, #12]
+
+//start timer
+LDR R1,=0b111
+ 188:	e3a01007 	mov	r1, #7
+STR R1, [R0, #4]
+ 18c:	e5801004 	str	r1, [r0, #4]
+
+MOV PC, LR
+ 190:	e1a0f00e 	mov	pc, lr
+
+00000194 <CONFIG_PRIVATE_TIMER>:
+
+CONFIG_PRIVATE_TIMER:
+LDR R0,=MPCORE_PRIV_TIMER
+ 194:	e59f0268 	ldr	r0, [pc, #616]	; 404 <__cs3_region_init_size_ram+0x14>
+
+
+LDR R1,=2000000
+ 198:	e59f1268 	ldr	r1, [pc, #616]	; 408 <__cs3_region_init_size_ram+0x18>
+STR R1, [R0] //load timer
+ 19c:	e5801000 	str	r1, [r0]
+
+LDR R1,=0b111 //masking
+ 1a0:	e3a01007 	mov	r1, #7
+STR R1, [R0,#8] //start timer
+ 1a4:	e5801008 	str	r1, [r0, #8]
+
+MOV PC, LR
+ 1a8:	e1a0f00e 	mov	pc, lr
+
+000001ac <PRIVATE_TIMER_ISR>:
+
+
+PRIVATE_TIMER_ISR:
+PUSH {LR}
+ 1ac:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+PUSH {R4-R10}
+ 1b0:	e92d07f0 	push	{r4, r5, r6, r7, r8, r9, r10}
+
+LDR R10,=GO_TIME
+ 1b4:	e59fa250 	ldr	r10, [pc, #592]	; 40c <__cs3_region_init_size_ram+0x1c>
+LDR R10,[R10]
+ 1b8:	e59aa000 	ldr	r10, [r10]
+
+LDR R7,=SECONDS
+ 1bc:	e59f724c 	ldr	r7, [pc, #588]	; 410 <__cs3_region_init_size_ram+0x20>
+LDR R8,[R7]  //R8 holds the number of seconds
+ 1c0:	e5978000 	ldr	r8, [r7]
+LDR R4,=HEX3_HEX0_BASE
+ 1c4:	e59f4248 	ldr	r4, [pc, #584]	; 414 <__cs3_region_init_size_ram+0x24>
+MOV R5, #0 //R5 is pattern register
+ 1c8:	e3a05000 	mov	r5, #0
+LDR R0, =MPCORE_PRIV_TIMER
+ 1cc:	e59f0230 	ldr	r0, [pc, #560]	; 404 <__cs3_region_init_size_ram+0x14>
+LDR R1, =1 //clear timer
+ 1d0:	e3a01001 	mov	r1, #1
+STR R1, [R0,#0xC]
+ 1d4:	e580100c 	str	r1, [r0, #12]
+
+//load hundred of seconds and seconds (Time is hundredths of seconds)
+LDR R0,=TIME
+ 1d8:	e59f0214 	ldr	r0, [pc, #532]	; 3f4 <__cs3_region_init_size_ram+0x4>
+LDR R1,[R0]
+ 1dc:	e5901000 	ldr	r1, [r0]
+
+
+CMP R10, #1
+ 1e0:	e35a0001 	cmp	r10, #1
+ADDEQ R1, #1
+ 1e4:	02811001 	addeq	r1, r1, #1
+CMP R1, #100
+ 1e8:	e3510064 	cmp	r1, #100	; 0x64
+MOVEQ R1, #0
+ 1ec:	03a01000 	moveq	r1, #0
+ADDEQ R8, #1
+ 1f0:	02888001 	addeq	r8, r8, #1
+CMP R8, #60
+ 1f4:	e358003c 	cmp	r8, #60	; 0x3c
+MOVEQ R8, #0
+ 1f8:	03a08000 	moveq	r8, #0
+STR R8, [R7]
+ 1fc:	e5878000 	str	r8, [r7]
+
+
+
+STR R1, [R0]
+ 200:	e5801000 	str	r1, [r0]
+
+MOV R0, R1
+ 204:	e1a00001 	mov	r0, r1
+BL DIVIDE
+ 208:	eb000062 	bl	398 <DIVIDE>
+
+MOV R6, R1 //save quotient in R6
+ 20c:	e1a06001 	mov	r6, r1
+BL SEG7_CODE
+ 210:	eb000054 	bl	368 <SEG7_CODE>
+
+
+
+ORR R5, R0, R5
+ 214:	e1805005 	orr	r5, r0, r5
+
+MOV R0,R6
+ 218:	e1a00006 	mov	r0, r6
+BL SEG7_CODE
+ 21c:	eb000051 	bl	368 <SEG7_CODE>
+LSL R0, #8
+ 220:	e1a00400 	lsl	r0, r0, #8
+ORR R5, R0, R5
+ 224:	e1805005 	orr	r5, r0, r5
+
+
+MOV R0, R8
+ 228:	e1a00008 	mov	r0, r8
+BL DIVIDE
+ 22c:	eb000059 	bl	398 <DIVIDE>
+MOV R6, R1 //save quotient in R6
+ 230:	e1a06001 	mov	r6, r1
+BL SEG7_CODE
+ 234:	eb00004b 	bl	368 <SEG7_CODE>
+LSL R0, #16
+ 238:	e1a00800 	lsl	r0, r0, #16
+ORR R5, R0, R5
+ 23c:	e1805005 	orr	r5, r0, r5
+
+MOV R0, R6
+ 240:	e1a00006 	mov	r0, r6
+BL SEG7_CODE
+ 244:	eb000047 	bl	368 <SEG7_CODE>
+LSL R0, #24
+ 248:	e1a00c00 	lsl	r0, r0, #24
+ORR R5, R0, R5
+ 24c:	e1805005 	orr	r5, r0, r5
+
+STR R5, [R4]
+ 250:	e5845000 	str	r5, [r4]
+
+00000254 <END_PRIVATE_TIMER_ISR>:
+
+
+END_PRIVATE_TIMER_ISR:
+POP {R4-R10}
+ 254:	e8bd07f0 	pop	{r4, r5, r6, r7, r8, r9, r10}
+POP {LR}
+ 258:	e49de004 	pop	{lr}		; (ldr lr, [sp], #4)
+
+MOV PC, LR
+ 25c:	e1a0f00e 	mov	pc, lr
+
+00000260 <TIMER_ISR>:
+
+
+
+TIMER_ISR:
+
+PUSH {R0,R1,R2}
+ 260:	e92d0007 	push	{r0, r1, r2}
+//clear interrupt
+LDR R0,=TIMER_BASE
+ 264:	e59f018c 	ldr	r0, [pc, #396]	; 3f8 <__cs3_region_init_size_ram+0x8>
+MOV R1, #0
+ 268:	e3a01000 	mov	r1, #0
+STR R1, [R0]
+ 26c:	e5801000 	str	r1, [r0]
+
+LDR R0, =COUNT
+ 270:	e59f0170 	ldr	r0, [pc, #368]	; 3e8 <GO_TIME+0x1c>
+LDR R1, [R0]
+ 274:	e5901000 	ldr	r1, [r0]
+
+LDR R2,=RUN
+ 278:	e59f216c 	ldr	r2, [pc, #364]	; 3ec <GO_TIME+0x20>
+LDR R2, [R2]
+ 27c:	e5922000 	ldr	r2, [r2]
+AND R2, #1
+ 280:	e2022001 	and	r2, r2, #1
+CMP R2, #1
+ 284:	e3520001 	cmp	r2, #1
+
+ADDEQ R1, #1
+ 288:	02811001 	addeq	r1, r1, #1
+
+
+STR R1, [R0]
+ 28c:	e5801000 	str	r1, [r0]
+
+POP {R0, R1,R2}
+ 290:	e8bd0007 	pop	{r0, r1, r2}
+
+
+MOV PC, LR
+ 294:	e1a0f00e 	mov	pc, lr
+
+00000298 <KEY_ISR>:
+
+
+KEY_ISR:
+PUSH {R5}
+ 298:	e52d5004 	push	{r5}		; (str r5, [sp, #-4]!)
+//clear ISR
+LDR R0,=KEY_BASE
+ 29c:	e59f0140 	ldr	r0, [pc, #320]	; 3e4 <GO_TIME+0x18>
+LDR R1, [R0, #0xC]
+ 2a0:	e590100c 	ldr	r1, [r0, #12]
+STR R1, [R0, #0xC] //clear ISR
+ 2a4:	e580100c 	str	r1, [r0, #12]
+
+MOV R3, R1 //save r1 in r3 (R1 gets toggled on and off)
+ 2a8:	e1a03001 	mov	r3, r1
+
+LDR R0, =RUN
+ 2ac:	e59f0138 	ldr	r0, [pc, #312]	; 3ec <GO_TIME+0x20>
+LDR R2, [R0]
+ 2b0:	e5902000 	ldr	r2, [r0]
+
+EOR R1,R2,R1
+ 2b4:	e0221001 	eor	r1, r2, r1
+STR R1, [R0] //toggles run KEY_0
+ 2b8:	e5801000 	str	r1, [r0]
+
+LDR R0,=TIMER_BASE
+ 2bc:	e59f0134 	ldr	r0, [pc, #308]	; 3f8 <__cs3_region_init_size_ram+0x8>
+
+000002c0 <CHECK_KEY_1>:
+CHECK_KEY_1:
+LDR R2,=0b10
+ 2c0:	e3a02002 	mov	r2, #2
+ANDS R2, R2, R3
+ 2c4:	e0122003 	ands	r2, r2, r3
+BEQ CHECK_KEY_2
+ 2c8:	0a000000 	beq	2d0 <CHECK_KEY_2>
+BNE HALVE_TIMER
+ 2cc:	1a00000c 	bne	304 <HALVE_TIMER>
+
+000002d0 <CHECK_KEY_2>:
+
+
+CHECK_KEY_2:
+LDR R2, = 0b100
+ 2d0:	e3a02004 	mov	r2, #4
+ANDS R2, R2, R3
+ 2d4:	e0122003 	ands	r2, r2, r3
+BEQ CHECK_KEY_3
+ 2d8:	0a000000 	beq	2e0 <CHECK_KEY_3>
+BNE DOUBLE_TIMER
+ 2dc:	1a000013 	bne	330 <DOUBLE_TIMER>
+
+000002e0 <CHECK_KEY_3>:
+
+
+CHECK_KEY_3:
+LDR R2, =0b1000
+ 2e0:	e3a02008 	mov	r2, #8
+ANDS R2, R2, R3
+ 2e4:	e0122003 	ands	r2, r2, r3
+BEQ EXIT_KEY_ISR
+ 2e8:	0a00001a 	beq	358 <EXIT_KEY_ISR>
+BNE SET_GO_TIMER
+ 2ec:	1affffff 	bne	2f0 <SET_GO_TIMER>
+
+000002f0 <SET_GO_TIMER>:
+
+SET_GO_TIMER:
+LDR R2,=GO_TIME
+ 2f0:	e59f2114 	ldr	r2, [pc, #276]	; 40c <__cs3_region_init_size_ram+0x1c>
+LDR R1, [R2]
+ 2f4:	e5921000 	ldr	r1, [r2]
+
+EOR R1, R1, #1
+ 2f8:	e2211001 	eor	r1, r1, #1
+STR R1, [R2]
+ 2fc:	e5821000 	str	r1, [r2]
+B EXIT_KEY_ISR
+ 300:	ea000014 	b	358 <EXIT_KEY_ISR>
+
+00000304 <HALVE_TIMER>:
+
+
+HALVE_TIMER:
+LDR R2,=0b1000
+ 304:	e3a02008 	mov	r2, #8
+STR R2, [R0,#4] //stop timer
+ 308:	e5802004 	str	r2, [r0, #4]
+LDR R2, [R0,#0xC]
+ 30c:	e590200c 	ldr	r2, [r0, #12]
+LSL R2, #16
+ 310:	e1a02802 	lsl	r2, r2, #16
+LDR R5, [R0, #0x8]
+ 314:	e5905008 	ldr	r5, [r0, #8]
+ORR R2, R5, R2
+ 318:	e1852002 	orr	r2, r5, r2
+
+LSR R2, #1
+ 31c:	e1a020a2 	lsr	r2, r2, #1
+
+STRH R2, [R0, #0x8]
+ 320:	e1c020b8 	strh	r2, [r0, #8]
+LSR R2, #16
+ 324:	e1a02822 	lsr	r2, r2, #16
+STRH R2, [R0, #0xC]
+ 328:	e1c020bc 	strh	r2, [r0, #12]
+B EXIT_KEY_ISR
+ 32c:	ea000009 	b	358 <EXIT_KEY_ISR>
+
+00000330 <DOUBLE_TIMER>:
+
+DOUBLE_TIMER:
+LDR R2,=0b1000
+ 330:	e3a02008 	mov	r2, #8
+STR R2, [R0,#4] //stop timer
+ 334:	e5802004 	str	r2, [r0, #4]
+LDR R2, [R0,#0xC]
+ 338:	e590200c 	ldr	r2, [r0, #12]
+LSL R2, #16
+ 33c:	e1a02802 	lsl	r2, r2, #16
+LDR R5, [R0, #0x8]
+ 340:	e5905008 	ldr	r5, [r0, #8]
+ORR R2, R5, R2
+ 344:	e1852002 	orr	r2, r5, r2
+
+LSL R2, #1
+ 348:	e1a02082 	lsl	r2, r2, #1
+
+STRH R2, [R0, #0x8]
+ 34c:	e1c020b8 	strh	r2, [r0, #8]
+LSR R2, #16
+ 350:	e1a02822 	lsr	r2, r2, #16
+STRH R2, [R0, #0xC]
+ 354:	e1c020bc 	strh	r2, [r0, #12]
+
+00000358 <EXIT_KEY_ISR>:
+
+
+EXIT_KEY_ISR:
+//restart timer
+LDR R2,=0b0111
+ 358:	e3a02007 	mov	r2, #7
+STR R2, [R0,#4]
+ 35c:	e5802004 	str	r2, [r0, #4]
+POP {R5}
+ 360:	e49d5004 	pop	{r5}		; (ldr r5, [sp], #4)
+MOV PC, LR
+ 364:	e1a0f00e 	mov	pc, lr
+
+00000368 <SEG7_CODE>:
+
+    
+SEG7_CODE:  LDR    R1,=BIT_CODES  
+ 368:	e59f10a8 	ldr	r1, [pc, #168]	; 418 <__cs3_region_init_size_ram+0x28>
+            ADD     R1, R0         // index into the BIT_CODES "array"
+ 36c:	e0811000 	add	r1, r1, r0
+            LDRB    R0, [R1]       // load the bit pattern (to be returned)
+ 370:	e5d10000 	ldrb	r0, [r1]
+            MOV     PC, LR              
+ 374:	e1a0f00e 	mov	pc, lr
+
+00000378 <BIT_CODES>:
+ 378:	4f5b063f 	.word	0x4f5b063f
+ 37c:	077d6d66 	.word	0x077d6d66
+ 380:	0000677f 	.word	0x0000677f
+
+00000384 <SERVICE_UND>:
+            .byte   0b01101101, 0b01111101, 0b00000111, 0b01111111, 0b01100111
+            .skip   2      // pad with 2 bytes to maintain word alignment
+
+
+
+SERVICE_UND:               B        SERVICE_UND         // undefined instruction vector
+ 384:	eafffffe 	b	384 <SERVICE_UND>
+
+00000388 <SERVICE_SVC>:
+SERVICE_SVC:   			B        SERVICE_SVC         // software interrupt vector
+ 388:	eafffffe 	b	388 <SERVICE_SVC>
+
+0000038c <SERVICE_ABT_INST>:
+SERVICE_ABT_INST:   		B        SERVICE_ABT_INST    // aborted prefetch vector
+ 38c:	eafffffe 	b	38c <SERVICE_ABT_INST>
+
+00000390 <SERVICE_ABT_DATA>:
+SERVICE_ABT_DATA:           B        SERVICE_ABT_DATA    // aborted data vector  
+ 390:	eafffffe 	b	390 <SERVICE_ABT_DATA>
+
+00000394 <SERVICE_FIQ>:
+
+SERVICE_FIQ:              	B        SERVICE_FIQ         // FIQ interrupt vector
+ 394:	eafffffe 	b	394 <SERVICE_FIQ>
+
+00000398 <DIVIDE>:
+
+DIVIDE:     MOV    R2, #0
+ 398:	e3a02000 	mov	r2, #0
+
+0000039c <CONT>:
+CONT:       CMP    R0, #10
+ 39c:	e350000a 	cmp	r0, #10
+            BLT    DIV_END
+ 3a0:	ba000002 	blt	3b0 <DIV_END>
+            SUB    R0, #10
+ 3a4:	e240000a 	sub	r0, r0, #10
+            ADD    R2, #1
+ 3a8:	e2822001 	add	r2, r2, #1
+            B      CONT
+ 3ac:	eafffffa 	b	39c <CONT>
+
+000003b0 <DIV_END>:
+DIV_END:    MOV    R1, R2     // quotient in R1 (remainder in R0)
+ 3b0:	e1a01002 	mov	r1, r2
+            MOV    PC, LR
+ 3b4:	e1a0f00e 	mov	pc, lr
+
+000003b8 <KEY_HOLD>:
+ 3b8:	00000000 	.word	0x00000000
+
+000003bc <COUNT>:
+ 3bc:	00000000 	.word	0x00000000
+
+000003c0 <RUN>:
+ 3c0:	00000000 	.word	0x00000000
+
+000003c4 <TIME>:
+ 3c4:	00000000 	.word	0x00000000
+
+000003c8 <SECONDS>:
+ 3c8:	00000000 	.word	0x00000000
+
+000003cc <GO_TIME>:
+ 3cc:	00000000 	.word	0x00000000
+ 3d0:	fffec100 	.word	0xfffec100
+ 3d4:	0000ffff 	.word	0x0000ffff
+ 3d8:	fffed000 	.word	0xfffed000
+ 3dc:	fffed100 	.word	0xfffed100
+ 3e0:	fffed800 	.word	0xfffed800
+ 3e4:	ff200050 	.word	0xff200050
+ 3e8:	000003bc 	.word	0x000003bc
+ 3ec:	000003c0 	.word	0x000003c0
+ 3f0:	ff200000 	.word	0xff200000
+ 3f4:	000003c4 	.word	0x000003c4
+ 3f8:	ff202000 	.word	0xff202000
+ 3fc:	00007840 	.word	0x00007840
+ 400:	0000017d 	.word	0x0000017d
+ 404:	fffec600 	.word	0xfffec600
+ 408:	001e8480 	.word	0x001e8480
+ 40c:	000003cc 	.word	0x000003cc
+ 410:	000003c8 	.word	0x000003c8
+ 414:	ff200020 	.word	0xff200020
+ 418:	00000378 	.word	0x00000378

@@ -1,0 +1,483 @@
+
+W:/lab6/lab6part3.axf:     file format elf32-littlearm
+
+
+Disassembly of section .vectors:
+
+00000000 <__cs3_interrupt_vector>:
+   0:	ea00000e 	b	40 <__cs3_region_init_ram>
+   4:	ea00002a 	b	b4 <SERVICE_ABT_DATA>
+   8:	ea000029 	b	b4 <SERVICE_ABT_DATA>
+   c:	ea000028 	b	b4 <SERVICE_ABT_DATA>
+  10:	ea000027 	b	b4 <SERVICE_ABT_DATA>
+  14:	00000000 	.word	0x00000000
+  18:	ea000025 	b	b4 <SERVICE_ABT_DATA>
+  1c:	ea000024 	b	b4 <SERVICE_ABT_DATA>
+
+Disassembly of section .text:
+
+00000040 <__cs3_region_start_ram>:
+
+                  .text                                       
+                  .global  _start                          
+_start:                                         
+/* Set up stack pointers for IRQ and SVC processor modes */
+                ldr sp,=0xFFFFFFFC
+  40:	e3e0d003 	mvn	sp, #3
+				mov R0,#0b10010
+  44:	e3a00012 	mov	r0, #18
+				msr  cpsr,R0
+  48:	e129f000 	msr	CPSR_fc, r0
+				mov R0,#0b10011
+  4c:	e3a00013 	mov	r0, #19
+				ldr sp,=0x3FFFFFFC
+  50:	e3e0d10f 	mvn	sp, #-1073741821	; 0xc0000003
+				msr cpsr,R0
+  54:	e129f000 	msr	CPSR_fc, r0
+				
+				
+				mov R10,#1
+  58:	e3a0a001 	mov	r10, #1
+
+                  BL       CONFIG_GIC       // configure the ARM generic
+  5c:	eb000062 	bl	1ec <CONFIG_GIC>
+                                            // interrupt controller
+                  BL       CONFIG_TIMER     // configure the Interval Timer
+  60:	eb000007 	bl	84 <CONFIG_TIMER>
+                  BL       CONFIG_KEYS      // configure the pushbutton
+  64:	eb00000e 	bl	a4 <CONFIG_KEYS>
+                                            // KEYs port
+
+/* Enable IRQ interrupts in the ARM processor */
+            mov R0,#0b01010011
+  68:	e3a00053 	mov	r0, #83	; 0x53
+		   	msr CPSR_c,R0
+  6c:	e121f000 	msr	CPSR_c, r0
+			   
+			   
+			   
+                  LDR      R5, =0xFF200000  // LEDR base address
+  70:	e59f5204 	ldr	r5, [pc, #516]	; 27c <__cs3_region_init_size_ram+0x4>
+
+00000074 <LOOP>:
+LOOP:                                          
+                  mov      R3,#N
+  74:	e3a03f66 	mov	r3, #408	; 0x198
+				  ldr       R3,[R3]
+  78:	e5933000 	ldr	r3, [r3]
+                  STR      R3, [R5]         // write to the LEDR lights
+  7c:	e5853000 	str	r3, [r5]
+                  B        LOOP                
+  80:	eafffffb 	b	74 <LOOP>
+
+00000084 <CONFIG_TIMER>:
+
+/* Configure the Interval Timer to create interrupts at 0.25 second intervals */
+CONFIG_TIMER:               
+                
+				
+			 ldr r0, =0xFF202000                   // Set timer base address 
+  84:	e59f01f4 	ldr	r0, [pc, #500]	; 280 <__cs3_region_init_size_ram+0x8>
+			 ldr R6, =0b0111100001000000
+  88:	e59f61f4 	ldr	r6, [pc, #500]	; 284 <__cs3_region_init_size_ram+0xc>
+			 ldr R7,=0b101111101
+  8c:	e59f71f4 	ldr	r7, [pc, #500]	; 288 <__cs3_region_init_size_ram+0x10>
+   
+   str r6, [r0, #8]                     // set lower bits of timeout 
+  90:	e5806008 	str	r6, [r0, #8]
+  
+   str r7,  [r0, #12]			// set higher bits of timeout
+  94:	e580700c 	str	r7, [r0, #12]
+
+   mov r1, #7
+  98:	e3a01007 	mov	r1, #7
+   str r1, [r0, #4]                   
+  9c:	e5801004 	str	r1, [r0, #4]
+				
+				
+				 
+                MOV PC, LR                 
+  a0:	e1a0f00e 	mov	pc, lr
+
+000000a4 <CONFIG_KEYS>:
+
+/* Configure the pushbutton KEYS to generate interrupts */
+CONFIG_KEYS:                                    
+                ldr R0,=0xFF200050
+  a4:	e59f01e0 	ldr	r0, [pc, #480]	; 28c <__cs3_region_init_size_ram+0x14>
+				mov R1,#0xF 
+  a8:	e3a0100f 	mov	r1, #15
+				str R1,[R0,#0x8] //Write 1111 into the key interrupt in order to enable the interrupts of all the keys.
+  ac:	e5801008 	str	r1, [r0, #8]
+     MOV PC, LR              
+  b0:	e1a0f00e 	mov	pc, lr
+
+000000b4 <SERVICE_ABT_DATA>:
+ SERVICE_SVC:
+   SERVICE_ABT_INST:
+  SERVICE_ABT_DATA:
+  SERVICE_FIQ:
+
+SERVICE_IRQ:    PUSH     {R0-R7, LR}     
+  b4:	e92d40ff 	push	{r0, r1, r2, r3, r4, r5, r6, r7, lr}
+                LDR      R4, =0xFFFEC100 // GIC CPU interface base address
+  b8:	e59f41d0 	ldr	r4, [pc, #464]	; 290 <__cs3_region_init_size_ram+0x18>
+                LDR      R5, [R4, #0x0C] // read the ICCIAR in the CPU
+  bc:	e594500c 	ldr	r5, [r4, #12]
+
+000000c0 <TIMER_HANDLER>:
+                                         // interface
+TIMER_HANDLER:  cmp R5,#72
+  c0:	e3550048 	cmp	r5, #72	; 0x48
+                BLEQ  INTERVAL_TIMER_ISR
+  c4:	0b000005 	bleq	e0 <INTERVAL_TIMER_ISR>
+
+000000c8 <KEYS_HANDLER>:
+
+
+KEYS_HANDLER:   CMP      R5, #73         // check the interrupt ID
+  c8:	e3550049 	cmp	r5, #73	; 0x49
+
+000000cc <UNEXPECTED>:
+
+UNEXPECTED:     BNE      UNEXPECTED      // if not recognized, stop here
+  cc:	1afffffe 	bne	cc <UNEXPECTED>
+                BL       KEY_ISR         
+  d0:	eb00000c 	bl	108 <KEY_ISR>
+
+000000d4 <EXIT_IRQ>:
+
+EXIT_IRQ:       STR      R5, [R4, #0x10] // write to the End of Interrupt
+  d4:	e5845010 	str	r5, [r4, #16]
+                                         // Register (ICCEOIR)
+                POP      {R0-R7, LR}     
+  d8:	e8bd40ff 	pop	{r0, r1, r2, r3, r4, r5, r6, r7, lr}
+                SUBS     PC, LR, #4      // return from exception
+  dc:	e25ef004 	subs	pc, lr, #4
+
+000000e0 <INTERVAL_TIMER_ISR>:
+
+
+INTERVAL_TIMER_ISR:
+   //Increment the global variable count.
+   mov R0,#N
+  e0:	e3a00f66 	mov	r0, #408	; 0x198
+   ldr R1,[R0]
+  e4:	e5901000 	ldr	r1, [r0]
+   
+   mov R11,#GO
+  e8:	e3a0bf67 	mov	r11, #412	; 0x19c
+   ldr R11,[R11]
+  ec:	e59bb000 	ldr	r11, [r11]
+   
+   add R1,R11
+  f0:	e081100b 	add	r1, r1, r11
+   str R1,[R0]   
+  f4:	e5801000 	str	r1, [r0]
+   
+   
+   ldr r0, =0xFF202000
+  f8:	e59f0180 	ldr	r0, [pc, #384]	; 280 <__cs3_region_init_size_ram+0x8>
+   
+  
+   mov R1,#0
+  fc:	e3a01000 	mov	r1, #0
+   str R1,[R0]
+ 100:	e5801000 	str	r1, [r0]
+   
+   
+                
+   
+   
+   B EXIT_IRQ
+ 104:	eafffff2 	b	d4 <EXIT_IRQ>
+
+00000108 <KEY_ISR>:
+
+  
+ 
+
+KEY_ISR:
+PUSH {R5}
+ 108:	e52d5004 	push	{r5}		; (str r5, [sp, #-4]!)
+//clear ISR
+LDR R0,=0xFF200050
+ 10c:	e59f0178 	ldr	r0, [pc, #376]	; 28c <__cs3_region_init_size_ram+0x14>
+LDR R1, [R0,#0XC]
+ 110:	e590100c 	ldr	r1, [r0, #12]
+STR R1, [R0, #0xC] //clear ISR
+ 114:	e580100c 	str	r1, [r0, #12]
+
+MOV R3, R1 //save r1 in r3 (R1 gets toggled on and off)
+ 118:	e1a03001 	mov	r3, r1
+
+mov R0,#GO
+ 11c:	e3a00f67 	mov	r0, #412	; 0x19c
+LDR R2, [R0]
+ 120:	e5902000 	ldr	r2, [r0]
+
+
+
+LDR R0,=0xFF202000
+ 124:	e59f0154 	ldr	r0, [pc, #340]	; 280 <__cs3_region_init_size_ram+0x8>
+
+00000128 <CHECK_KEY_0>:
+
+CHECK_KEY_0:
+LDR R2,=0b1
+ 128:	e3a02001 	mov	r2, #1
+ANDS R2, R2, R3
+ 12c:	e0122003 	ands	r2, r2, r3
+BEQ CHECK_KEY_1
+ 130:	0a000000 	beq	138 <CHECK_KEY_1>
+BNE STOP
+ 134:	1a000012 	bne	184 <STOP>
+
+00000138 <CHECK_KEY_1>:
+
+CHECK_KEY_1:
+LDR R2,=0b10
+ 138:	e3a02002 	mov	r2, #2
+ANDS R2, R2, R3
+ 13c:	e0122003 	ands	r2, r2, r3
+BEQ CHECK_KEY_2
+ 140:	0a000000 	beq	148 <CHECK_KEY_2>
+BNE HALVE_TIMER
+ 144:	1a000003 	bne	158 <HALVE_TIMER>
+
+00000148 <CHECK_KEY_2>:
+
+
+CHECK_KEY_2:
+LDR R2, = 0b100
+ 148:	e3a02004 	mov	r2, #4
+ANDS R2, R2, R3
+ 14c:	e0122003 	ands	r2, r2, r3
+BEQ EXIT_KEY_ISR
+ 150:	0a00001c 	beq	1c8 <EXIT_KEY_ISR>
+BNE DOUBLE_TIMER
+ 154:	1a000011 	bne	1a0 <DOUBLE_TIMER>
+
+00000158 <HALVE_TIMER>:
+
+HALVE_TIMER:
+LDR R2,=0b1000
+ 158:	e3a02008 	mov	r2, #8
+STR R2, [R0,#4] //stop timer
+ 15c:	e5802004 	str	r2, [r0, #4]
+LDR R2, [R0,#0xC]
+ 160:	e590200c 	ldr	r2, [r0, #12]
+LSL R2, #16
+ 164:	e1a02802 	lsl	r2, r2, #16
+LDR R5, [R0, #0x8]
+ 168:	e5905008 	ldr	r5, [r0, #8]
+ORR R2, R5, R2
+ 16c:	e1852002 	orr	r2, r5, r2
+
+LSR R2, #1
+ 170:	e1a020a2 	lsr	r2, r2, #1
+
+STRH R2, [R0, #0x8]
+ 174:	e1c020b8 	strh	r2, [r0, #8]
+LSR R2, #16
+ 178:	e1a02822 	lsr	r2, r2, #16
+STRH R2, [R0, #0xC]
+ 17c:	e1c020bc 	strh	r2, [r0, #12]
+B EXIT_KEY_ISR
+ 180:	ea000010 	b	1c8 <EXIT_KEY_ISR>
+
+00000184 <STOP>:
+
+STOP:
+mov R11,#GO
+ 184:	e3a0bf67 	mov	r11, #412	; 0x19c
+  ldr R10,[R11]
+ 188:	e59ba000 	ldr	r10, [r11]
+  cmp R10,#0
+ 18c:	e35a0000 	cmp	r10, #0
+  moveq R10,#1
+ 190:	03a0a001 	moveq	r10, #1
+  movne R10,#0
+ 194:	13a0a000 	movne	r10, #0
+  str R10,[R11]
+ 198:	e58ba000 	str	r10, [r11]
+  B EXIT_KEY_ISR
+ 19c:	ea000009 	b	1c8 <EXIT_KEY_ISR>
+
+000001a0 <DOUBLE_TIMER>:
+
+DOUBLE_TIMER:
+LDR R2,=0b1000
+ 1a0:	e3a02008 	mov	r2, #8
+STR R2, [R0,#4] //stop timer
+ 1a4:	e5802004 	str	r2, [r0, #4]
+LDR R2, [R0,#0xC]
+ 1a8:	e590200c 	ldr	r2, [r0, #12]
+LSL R2, #16
+ 1ac:	e1a02802 	lsl	r2, r2, #16
+LDR R5, [R0, #0x8]
+ 1b0:	e5905008 	ldr	r5, [r0, #8]
+ORR R2, R5, R2
+ 1b4:	e1852002 	orr	r2, r5, r2
+
+LSL R2, #1
+ 1b8:	e1a02082 	lsl	r2, r2, #1
+
+STRH R2, [R0, #0x8]
+ 1bc:	e1c020b8 	strh	r2, [r0, #8]
+LSR R2, #16
+ 1c0:	e1a02822 	lsr	r2, r2, #16
+STRH R2, [R0, #0xC]
+ 1c4:	e1c020bc 	strh	r2, [r0, #12]
+
+000001c8 <EXIT_KEY_ISR>:
+
+
+EXIT_KEY_ISR:
+//restart timer
+LDR R2,=0b0111
+ 1c8:	e3a02007 	mov	r2, #7
+STR R2, [R0,#4]
+ 1cc:	e5802004 	str	r2, [r0, #4]
+POP {R5}
+ 1d0:	e49d5004 	pop	{r5}		; (ldr r5, [sp], #4)
+MOV PC, LR
+ 1d4:	e1a0f00e 	mov	pc, lr
+
+000001d8 <N>:
+ 1d8:	00000000 	.word	0x00000000
+
+000001dc <GO>:
+ 1dc:	00000001 	.word	0x00000001
+
+000001e0 <KEY_HOLD>:
+ 1e0:	00000000 	.word	0x00000000
+
+000001e4 <COUNT>:
+ 1e4:	00000000 	.word	0x00000000
+
+000001e8 <RUN>:
+ 1e8:	00000001 	.word	0x00000001
+
+000001ec <CONFIG_GIC>:
+/* 
+ * Configure the Generic Interrupt Controller (GIC)
+*/
+				.global	CONFIG_GIC
+CONFIG_GIC:
+				PUSH		{LR}
+ 1ec:	e52de004 	push	{lr}		; (str lr, [sp, #-4]!)
+    			/* Configure the A9 Private Timer interrupt, FPGA KEYs, and FPGA Timer
+				/* CONFIG_INTERRUPT (int_ID (R0), CPU_target (R1)); */
+    			MOV		R0, #MPCORE_PRIV_TIMER_IRQ
+ 1f0:	e3a0001d 	mov	r0, #29
+    			MOV		R1, #CPU0
+ 1f4:	e3a01001 	mov	r1, #1
+    			BL			CONFIG_INTERRUPT
+ 1f8:	eb00000d 	bl	234 <CONFIG_INTERRUPT>
+    			MOV		R0, #INTERVAL_TIMER_IRQ
+ 1fc:	e3a00048 	mov	r0, #72	; 0x48
+    			MOV		R1, #CPU0
+ 200:	e3a01001 	mov	r1, #1
+    			BL			CONFIG_INTERRUPT
+ 204:	eb00000a 	bl	234 <CONFIG_INTERRUPT>
+    			MOV		R0, #KEYS_IRQ
+ 208:	e3a00049 	mov	r0, #73	; 0x49
+    			MOV		R1, #CPU0
+ 20c:	e3a01001 	mov	r1, #1
+    			BL			CONFIG_INTERRUPT
+ 210:	eb000007 	bl	234 <CONFIG_INTERRUPT>
+
+				/* configure the GIC CPU interface */
+    			LDR		R0, =0xFFFEC100		// base address of CPU interface
+ 214:	e59f0074 	ldr	r0, [pc, #116]	; 290 <__cs3_region_init_size_ram+0x18>
+    			/* Set Interrupt Priority Mask Register (ICCPMR) */
+    			LDR		R1, =0xFFFF 			// enable interrupts of all priorities levels
+ 218:	e59f1074 	ldr	r1, [pc, #116]	; 294 <__cs3_region_init_size_ram+0x1c>
+    			STR		R1, [R0, #0x04]
+ 21c:	e5801004 	str	r1, [r0, #4]
+    			/* Set the enable bit in the CPU Interface Control Register (ICCICR). This bit
+				 * allows interrupts to be forwarded to the CPU(s) */
+    			MOV		R1, #1
+ 220:	e3a01001 	mov	r1, #1
+    			STR		R1, [R0]
+ 224:	e5801000 	str	r1, [r0]
+    
+    			/* Set the enable bit in the Distributor Control Register (ICDDCR). This bit
+				 * allows the distributor to forward interrupts to the CPU interface(s) */
+    			LDR		R0, =0xFFFED000
+ 228:	e59f0068 	ldr	r0, [pc, #104]	; 298 <__cs3_region_init_size_ram+0x20>
+    			STR		R1, [R0]    
+ 22c:	e5801000 	str	r1, [r0]
+    
+    			POP     	{PC}
+ 230:	e49df004 	pop	{pc}		; (ldr pc, [sp], #4)
+
+00000234 <CONFIG_INTERRUPT>:
+ * other registers in the GIC
+ * Arguments: R0 = interrupt ID, N
+ *            R1 = CPU target
+*/
+CONFIG_INTERRUPT:
+    			PUSH		{R4-R5, LR}
+ 234:	e92d4030 	push	{r4, r5, lr}
+    
+    			/* Configure Interrupt Set-Enable Registers (ICDISERn). 
+				 * reg_offset = (integer_div(N / 32) * 4
+				 * value = 1 << (N mod 32) */
+    			LSR		R4, R0, #3							// calculate reg_offset
+ 238:	e1a041a0 	lsr	r4, r0, #3
+    			BIC		R4, R4, #3							// R4 = reg_offset
+ 23c:	e3c44003 	bic	r4, r4, #3
+				LDR		R2, =0xFFFED100
+ 240:	e59f2054 	ldr	r2, [pc, #84]	; 29c <__cs3_region_init_size_ram+0x24>
+				ADD		R4, R2, R4							// R4 = address of ICDISER
+ 244:	e0824004 	add	r4, r2, r4
+    
+    			AND		R2, R0, #0x1F   					// N mod 32
+ 248:	e200201f 	and	r2, r0, #31
+				MOV		R5, #1								// enable
+ 24c:	e3a05001 	mov	r5, #1
+    			LSL		R2, R5, R2							// R2 = value
+ 250:	e1a02215 	lsl	r2, r5, r2
+
+				/* now that we have the register address (R4) and value (R2), we need to set the
+				 * correct bit in the GIC register */
+    			LDR		R3, [R4]								// read current register value
+ 254:	e5943000 	ldr	r3, [r4]
+    			ORR		R3, R3, R2							// set the enable bit
+ 258:	e1833002 	orr	r3, r3, r2
+    			STR		R3, [R4]								// store the new register value
+ 25c:	e5843000 	str	r3, [r4]
+
+    			/* Configure Interrupt Processor Targets Register (ICDIPTRn)
+     			 * reg_offset = integer_div(N / 4) * 4
+     			 * index = N mod 4 */
+    			BIC		R4, R0, #3							// R4 = reg_offset
+ 260:	e3c04003 	bic	r4, r0, #3
+				LDR		R2, =0xFFFED800
+ 264:	e59f2034 	ldr	r2, [pc, #52]	; 2a0 <__cs3_region_init_size_ram+0x28>
+				ADD		R4, R2, R4							// R4 = word address of ICDIPTR
+ 268:	e0824004 	add	r4, r2, r4
+    			AND		R2, R0, #0x3						// N mod 4
+ 26c:	e2002003 	and	r2, r0, #3
+				ADD		R4, R2, R4							// R4 = byte address in ICDIPTR
+ 270:	e0824004 	add	r4, r2, r4
+
+				/* now that we have the register address (R4) and value (R2), write to (only)
+				 * the appropriate byte */
+				STRB		R1, [R4]
+ 274:	e5c41000 	strb	r1, [r4]
+    
+    			POP		{R4-R5, PC}
+ 278:	e8bd8030 	pop	{r4, r5, pc}
+ 27c:	ff200000 	.word	0xff200000
+ 280:	ff202000 	.word	0xff202000
+ 284:	00007840 	.word	0x00007840
+ 288:	0000017d 	.word	0x0000017d
+ 28c:	ff200050 	.word	0xff200050
+ 290:	fffec100 	.word	0xfffec100
+ 294:	0000ffff 	.word	0x0000ffff
+ 298:	fffed000 	.word	0xfffed000
+ 29c:	fffed100 	.word	0xfffed100
+ 2a0:	fffed800 	.word	0xfffed800
